@@ -123,7 +123,7 @@ const error = (type) => {
 // Initialize
 const init = () => {
   const args = process.argv.slice(2);
-  const url = _.get(args, "[0]");
+  const url = _.get(args, "[0]", '');
   const depth = _.parseInt(_.get(args, "[1]", 0));
   let isError = false;
   if (!validator.isURL(url)) {
