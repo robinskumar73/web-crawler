@@ -21,9 +21,11 @@ class Crawler {
     const $ = await this.connect(this.url, currentDepth);
     this.findAllImages($, this.url, currentDepth, this.images);
     const linkedUrls = await this.findAllLinkedUrls($, this.url);
+    console.log(this.url, linkedUrls);
     if (currentDepth < this.depthLimit && linkedUrls && linkedUrls.length) {
       for (const linkedUrl of linkedUrls) {
         try {
+         
           await this.recursiveCrawlTillDepthReached(
             linkedUrl,
             currentDepth + 1
@@ -124,17 +126,23 @@ class Crawler {
     }
   }
 
+  isSamePageUrl(url, parentUrl){
+    const domain = this.getUrlDomain(parentUrl);
+    const urlPattern = new RegExp(`${domain}.+`);
+    return urlPattern.test(url);
+  }
+
   async findAllLinkedUrls($, parentUrl) {
     const urls = [];
     const that = this;
     parentUrl = parentUrl.replace(/\/$/, "");
-    const urlPattern = new RegExp(`${parentUrl}.+`);
+
     $("a").each(function (i, link) {
       let url = $(link).attr("href");
       url = _.replace(url, /\/$/, "");
       if (url) {
         url = that.getAbsUrl(url, parentUrl);
-        if (urlPattern.test(url) && validator.isURL(url)) {
+        if (that.isSamePageUrl(url, parentUrl) && validator.isURL(url)) {
           urls.push(url);
         }
       }
