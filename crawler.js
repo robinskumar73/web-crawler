@@ -5,6 +5,7 @@ const puppeteer = require("puppeteer");
 const _ = require("lodash");
 const validator = require("validator");
 const cheerio = require("cheerio");
+var fs = require("fs");
 
 class Crawler {
   constructor(url, depth) {
@@ -17,32 +18,32 @@ class Crawler {
   async initCrawl() {
     const currentDepth = 0;
     const $ = await this.connect(this.url, currentDepth);
-    this.findAllImages($, this.url, 0, this.images);
+    this.findAllImages($, this.url, currentDepth, this.images);
     const linkedUrls = await this.findAllLinkedUrls($, this.url);
-    if(currentDepth < this.depthLimit && linkedUrls && linkedUrls.length){
-      for(const linkedUrl of linkedUrls){
-        await this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth+1);
+    if (currentDepth < this.depthLimit && linkedUrls && linkedUrls.length) {
+      for (const linkedUrl of linkedUrls) {
+        await this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth + 1);
       }
     }
-
-    console.log("All Images", this.images);
+    return save();
   }
 
   async recursiveCrawlTillDepthReached(targetUrl, currentDepth) {
     const $ = await this.connect(targetUrl, currentDepth);
-    this.findAllImages($, targetUrl, 0, this.images);
-    if(currentDepth < this.depthLimit){
+    this.findAllImages($, targetUrl, currentDepth, this.images);
+    if (currentDepth < this.depthLimit) {
       const linkedUrls = await this.findAllLinkedUrls($, targetUrl);
-      if(linkedUrls && linkedUrls.length){
-        const promises = []
-        for(const linkedUrl of linkedUrls){
-          promises.push(this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth+1));
+      if (linkedUrls && linkedUrls.length) {
+        const promises = [];
+        for (const linkedUrl of linkedUrls) {
+          promises.push(
+            this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth + 1)
+          );
         }
         await Promise.all(promises);
       }
     }
   }
-
 
   async connect(url, depth) {
     let $;
@@ -68,9 +69,18 @@ class Crawler {
     return $;
   }
 
+  save() {
+    return new Promise((resolve, reject) => {
+      var json = JSON.stringify({
+        results: this.images
+      });
+      fs.writeFile("results.json", json, "utf8", resolve);
+    });
+  }
+
   async findAllImages($, sourceUrl, depth, images) {
     const that = this;
-    if($){
+    if ($) {
       $("img").map(function () {
         const imageUrl = $(this).attr("src");
         if (!that.urlCrawled[imageUrl]) {
