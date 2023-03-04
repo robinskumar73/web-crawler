@@ -21,7 +21,6 @@ class Crawler {
     const $ = await this.connect(this.url, currentDepth);
     this.findAllImages($, this.url, currentDepth, this.images);
     const linkedUrls = await this.findAllLinkedUrls($, this.url);
-    console.log(this.url, linkedUrls);
     if (currentDepth < this.depthLimit && linkedUrls && linkedUrls.length) {
       for (const linkedUrl of linkedUrls) {
         try {
