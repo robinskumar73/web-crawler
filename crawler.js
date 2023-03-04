@@ -25,7 +25,7 @@ class Crawler {
         await this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth + 1);
       }
     }
-    return save();
+    return this.save();
   }
 
   async recursiveCrawlTillDepthReached(targetUrl, currentDepth) {
