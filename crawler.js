@@ -9,6 +9,7 @@ var fs = require("fs");
 
 class Crawler {
   constructor(url, depth) {
+    url = _.replace(url, /\/$/, "");
     this.url = url;
     this.depthLimit = depth;
     this.images = [];
@@ -22,7 +23,14 @@ class Crawler {
     const linkedUrls = await this.findAllLinkedUrls($, this.url);
     if (currentDepth < this.depthLimit && linkedUrls && linkedUrls.length) {
       for (const linkedUrl of linkedUrls) {
-        await this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth + 1);
+        try {
+          await this.recursiveCrawlTillDepthReached(
+            linkedUrl,
+            currentDepth + 1
+          );
+        } catch (error) {
+          console.error(error);
+        }
       }
     }
     return this.save();
@@ -40,7 +48,7 @@ class Crawler {
             this.recursiveCrawlTillDepthReached(linkedUrl, currentDepth + 1)
           );
         }
-        await Promise.all(promises);
+        await Promise.allSettled(promises);
       }
     }
   }
@@ -78,19 +86,40 @@ class Crawler {
     });
   }
 
+  getUrlDomain(url){
+    const patt = /^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)/;
+    url = _.get(url.match(patt), "[0]");
+    return url;
+  }
+
+  getAbsUrl(url, sourceUrl){
+    if(!validator.isURL(url)){
+      const isNotAbsUrlPatt = /^\//;
+      if (isNotAbsUrlPatt.test(url)) {
+        const domain = this.getUrlDomain(sourceUrl);
+        console.log("Domain", domain, url);
+        url = `${domain}${url}`;
+      }
+    }
+    return url;
+  }
+
   async findAllImages($, sourceUrl, depth, images) {
     const that = this;
     if ($) {
       $("img").map(function () {
-        const imageUrl = $(this).attr("src");
+        let imageUrl = $(this).attr("src");
         if (!that.urlCrawled[imageUrl]) {
           that.urlCrawled[imageUrl] = true;
+          imageUrl = that.getAbsUrl(imageUrl, sourceUrl);
+          if (validator.isURL(imageUrl)) {
+            images.push({
+              imageUrl,
+              sourceUrl,
+              depth,
+            });
+          }
           // console.log(imageUrl);
-          images.push({
-            imageUrl,
-            sourceUrl,
-            depth,
-          });
         }
       });
     }
@@ -98,16 +127,14 @@ class Crawler {
 
   async findAllLinkedUrls($, parentUrl) {
     const urls = [];
+    const that = this;
     parentUrl = parentUrl.replace(/\/$/, "");
     const urlPattern = new RegExp(`${parentUrl}.+`);
     $("a").each(function (i, link) {
       let url = $(link).attr("href");
       url = _.replace(url, /\/$/, "");
       if (url) {
-        const isNotAbsUrlPatt = /^\//;
-        if(isNotAbsUrlPatt.test(url)){
-          url = `${parentUrl}${url}`;
-        }
+        url = that.getAbsUrl(url, parentUrl);
         if (urlPattern.test(url) && validator.isURL(url)) {
           urls.push(url);
         }
