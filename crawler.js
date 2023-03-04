@@ -97,7 +97,6 @@ class Crawler {
       const isNotAbsUrlPatt = /^\//;
       if (isNotAbsUrlPatt.test(url)) {
         const domain = this.getUrlDomain(sourceUrl);
-        console.log("Domain", domain, url);
         url = `${domain}${url}`;
       }
     }
