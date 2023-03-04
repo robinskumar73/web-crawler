@@ -1,0 +1,19 @@
+{
+  "name": "node-crawler",
+  "version": "1.0.0",
+  "description": "Javascript crawler cli written in nodejs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robinskumar73/web-crawler.git"
+  },
+  "author": "Robins Gupta",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/robinskumar73/web-crawler/issues"
+  },
+  "homepage": "https://github.com/robinskumar73/web-crawler#readme"
+}
