@@ -5,7 +5,9 @@ const puppeteer = require("puppeteer");
 const _ = require("lodash");
 const validator = require("validator");
 const cheerio = require("cheerio");
-var fs = require("fs");
+const fs = require("fs");
+const axios = require("axios");
+
 
 class Crawler {
   constructor(url, depth) {
@@ -24,7 +26,6 @@ class Crawler {
     if (currentDepth < this.depthLimit && linkedUrls && linkedUrls.length) {
       for (const linkedUrl of linkedUrls) {
         try {
-         
           await this.recursiveCrawlTillDepthReached(
             linkedUrl,
             currentDepth + 1
@@ -34,7 +35,36 @@ class Crawler {
         }
       }
     }
+    await this.downloadImage();
     return this.save();
+  }
+
+  makeid(length) {
+    let result = '';
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let counter = 0;
+    while (counter < length) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+      counter += 1;
+    }
+    return result;
+}
+
+  async downloadImage() {
+    for (let image of this.images) {
+      console.log("Downloading image", image.imageUrl);
+      const arrayBuffer = await axios.get(image.imageUrl, {
+        responseType: "arraybuffer",
+      });
+      const buffer = Buffer.from(arrayBuffer.data, "binary").toString("base64");
+      const imageData = `data:${arrayBuffer.headers["content-type"]};base64,${buffer}`;
+      console.log(imageData);
+      let imageName = this.makeid(10);
+      const imagePath = `images/${imageName}.jpg`;
+      console.log("Saving", imagePath);
+      await this.save(imagePath, imageData);
+    }
   }
 
   async recursiveCrawlTillDepthReached(targetUrl, currentDepth) {
@@ -63,12 +93,21 @@ class Crawler {
       // Set screen size
       await page.setViewport({ width: 1080, height: 1024 });
       const document = await page.goto(url, {
-        waitUntil: "domcontentloaded",
-        timeout: 60000,
+        waitUntil: "networkidle0",
+        timeout: 600000,
       });
+      const data = await page.evaluate(
+        () => document.querySelector("*").outerHTML
+      );
+      // console.log(data);
+      // await page.waitForNavigation({
+      //   waitUntil: 'networkidle0',
+      // });
+      await this.save("data.html", data);
+      // fs.writeFile("data.html", data, "utf8");
       console.log("Connected");
-      const html = await document.text();
-      $ = cheerio.load(html);
+      // const html = await document.text();
+      $ = cheerio.load(data);
     } catch (error) {
       console.error(error.message);
       await browser.close();
@@ -78,23 +117,45 @@ class Crawler {
     return $;
   }
 
-  save() {
+  save(file, data) {
     return new Promise((resolve, reject) => {
-      var json = JSON.stringify({
-        results: this.images,
-      });
-      fs.writeFile("results.json", json, "utf8", resolve);
+      if (file) {
+        fs.writeFile(file, data, "utf8", resolve);
+      } else {
+        var json = JSON.stringify({
+          results: this.images,
+        });
+        fs.writeFile("results.json", json, "utf8", resolve);
+      }
     });
   }
 
-  getUrlDomain(url){
+  getUrlDomain(url) {
     const patt = /^(?:https?:\/\/)?(?:[^@\/\n]+@)?(?:www\.)?([^:\/?\n]+)/;
     url = _.get(url.match(patt), "[0]");
     return url;
   }
 
-  getAbsUrl(url, sourceUrl){
-    if(!validator.isURL(url)){
+  checkforDoubleSlash(url) {
+    const patt = /^\/\//;
+    url = _.replace(url, patt, "");
+
+    return url;
+  }
+
+  checkForProtocol(url) {
+    const patt = /^https?\:\/\/.+/;
+    const isUrl = validator.isURL(url);
+    if (isUrl && !patt.test(url)) {
+      url = `https://${url}`;
+    }
+    return url;
+  }
+
+  getAbsUrl(url, sourceUrl) {
+    url = this.checkforDoubleSlash(url);
+    url = this.checkForProtocol(url);
+    if (!validator.isURL(url)) {
       const isNotAbsUrlPatt = /^\//;
       if (isNotAbsUrlPatt.test(url)) {
         const domain = this.getUrlDomain(sourceUrl);
@@ -122,10 +183,33 @@ class Crawler {
           // console.log(imageUrl);
         }
       });
+
+      $("a").map(function () {
+        const item = $(this).attr("style");
+        if (item) {
+          const patt = /background\-image\: url\(\/\//;
+          let imageUrl = _.replace(item, patt, "");
+          imageUrl = _.replace(imageUrl, /\)\;$/, "");
+          // const urls = item.match(patt);
+          // console.log(url);
+          if (!that.urlCrawled[imageUrl]) {
+            that.urlCrawled[imageUrl] = true;
+            imageUrl = that.getAbsUrl(imageUrl, sourceUrl);
+            if (validator.isURL(imageUrl)) {
+              images.push({
+                imageUrl,
+                sourceUrl,
+                depth,
+              });
+            }
+            // console.log(imageUrl);
+          }
+        }
+      });
     }
   }
 
-  isSamePageUrl(url, parentUrl){
+  isSamePageUrl(url, parentUrl) {
     const domain = this.getUrlDomain(parentUrl);
     const urlPattern = new RegExp(`${domain}.+`);
     return urlPattern.test(url);
@@ -133,6 +217,7 @@ class Crawler {
 
   async findAllLinkedUrls($, parentUrl) {
     const urls = [];
+    const urlObj = {};
     const that = this;
     parentUrl = parentUrl.replace(/\/$/, "");
 
@@ -142,7 +227,10 @@ class Crawler {
       if (url) {
         url = that.getAbsUrl(url, parentUrl);
         if (that.isSamePageUrl(url, parentUrl) && validator.isURL(url)) {
-          urls.push(url);
+          if (!urlObj[url]) {
+            urls.push(url);
+            urlObj[url] = true;
+          }
         }
       }
     });

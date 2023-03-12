@@ -22,6 +22,7 @@
     "fs": "^0.0.1-security",
     "lodash": "^4.17.21",
     "minimist": "^1.2.8",
+    "nanoid": "^4.0.1",
     "puppeteer": "^19.7.2",
     "validator": "^13.9.0"
   }
